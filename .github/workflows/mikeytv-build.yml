@@ -1,0 +1,103 @@
+# Builds the MikeyTV Android TV app and publishes it for the Downloader app.
+#
+# Optional repository secrets:
+#   EXTENSIONS_USERNAME, EXTENSIONS_PASSWORD
+#     A GitHub username and classic token with read:packages. Adds Wholphin's
+#     FFmpeg, AV1 and MPV extensions. Without them those are left out.
+#   SIGNING_KEY (base64 keystore), KEY_ALIAS, KEY_PASSWORD, KEY_STORE_PASSWORD
+#     Keeps one signing key, so each build installs over the last. Without them
+#     each build gets a throwaway key and needs an uninstall first.
+
+name: MikeyTV Build
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [mikeytv]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: write
+
+env:
+  GRADLE_OPTS: "-Dorg.gradle.jvmargs='-Xmx12g -XX:MaxMetaspaceSize=1024m'"
+  MIKEYTV_VERSION_CODE: ${{ github.run_number }}
+  MIKEYTV_VERSION_NAME: mikeytv-${{ github.run_number }}
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Setup
+        uses: ./.github/actions/setup
+      - name: Configure extensions and signing
+        env:
+          EXT_USER: ${{ secrets.EXTENSIONS_USERNAME }}
+          EXT_PASS: ${{ secrets.EXTENSIONS_PASSWORD }}
+          SIGNING_KEY: ${{ secrets.SIGNING_KEY }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+          KEY_STORE_PASSWORD: ${{ secrets.KEY_STORE_PASSWORD }}
+        run: |
+          # Only set when present: an empty property still switches the
+          # build to the extensions repository, which then fails.
+          if [ -n "$EXT_USER" ] && [ -n "$EXT_PASS" ]; then
+            echo "ORG_GRADLE_PROJECT_WholphinExtensionsUsername=$EXT_USER" >> "$GITHUB_ENV"
+            echo "ORG_GRADLE_PROJECT_WholphinExtensionsPassword=$EXT_PASS" >> "$GITHUB_ENV"
+          else
+            echo "::warning::No extensions token set. Building without FFmpeg, AV1 and MPV."
+          fi
+          if [ -n "$SIGNING_KEY" ]; then
+            {
+              echo "SIGNING_KEY=$SIGNING_KEY"
+              echo "KEY_ALIAS=$KEY_ALIAS"
+              echo "KEY_PASSWORD=$KEY_PASSWORD"
+              echo "KEY_STORE_PASSWORD=$KEY_STORE_PASSWORD"
+            } >> "$GITHUB_ENV"
+          else
+            echo "::warning::No signing secrets set. Using a throwaway key, so this APK cannot update an earlier install."
+            PASS=$(openssl rand -hex 16)
+            keytool -genkeypair -keystore throwaway.jks -storepass "$PASS" -keypass "$PASS" \
+              -alias mikeytv -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=MikeyTV"
+            {
+              echo "SIGNING_KEY=$(base64 -w0 throwaway.jks)"
+              echo "KEY_ALIAS=mikeytv"
+              echo "KEY_PASSWORD=$PASS"
+              echo "KEY_STORE_PASSWORD=$PASS"
+            } >> "$GITHUB_ENV"
+            rm throwaway.jks
+          fi
+      - name: Build
+        run: ./gradlew assembleAppstoreRelease
+      - name: Collect APKs
+        run: |
+          mkdir -p out
+          find app/build/outputs/apk -name '*.apk' -print
+          cp "$(find app/build/outputs/apk -name '*armeabi-v7a*.apk' | head -n 1)" out/MikeyTV.apk
+          cp "$(find app/build/outputs/apk -name '*arm64-v8a*.apk' | head -n 1)" out/MikeyTV-arm64.apk
+          U="$(find app/build/outputs/apk -name '*universal*.apk' | head -n 1)"
+          # Git rejects files over 100 MB, so only publish the universal APK below that.
+          if [ "$(stat -c %s "$U")" -lt 95000000 ]; then cp "$U" out/MikeyTV-universal.apk; fi
+          "$ANDROID_SDK_ROOT/build-tools/$BUILD_TOOLS_VERSION/apksigner" verify out/MikeyTV.apk
+          ls -la out
+      - uses: actions/upload-artifact@v4
+        with:
+          name: mikeytv-android
+          path: out/*.apk
+          compression-level: 0
+      - name: Publish for Downloader
+        run: |
+          cd out
+          git init -q -b downloads
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add .
+          git commit -q -m "Publish APKs for $GITHUB_SHA"
+          git push -f "https://x-access-token:${{ github.token }}@github.com/$GITHUB_REPOSITORY.git" downloads

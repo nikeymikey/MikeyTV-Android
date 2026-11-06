@@ -25,3 +25,7 @@
 
 # Keep external/native functions
 -keep class com.suyashbelekar.exoplayerhdrutils.libdovi.LibDovi { *; }
+
+# MikeyTV: message models are serialised by reflection in the Jellyfin SDK
+-keep class com.github.damontecres.wholphin.mikeytv.** { *; }
+-keep class com.github.damontecres.wholphin.mikeytv.**$$serializer { *; }

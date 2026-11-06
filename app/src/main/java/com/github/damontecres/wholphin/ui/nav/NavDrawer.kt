@@ -27,6 +27,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.KeyboardArrowLeft
+import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
@@ -49,6 +50,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.IntOffset
@@ -70,6 +72,7 @@ import androidx.tv.material3.Text
 import com.github.damontecres.wholphin.R
 import com.github.damontecres.wholphin.data.model.JellyfinServer
 import com.github.damontecres.wholphin.data.model.JellyfinUser
+import com.github.damontecres.wholphin.mikeytv.LocalMessageCenter
 import com.github.damontecres.wholphin.preferences.AppThemeColors
 import com.github.damontecres.wholphin.preferences.UserPreferences
 import com.github.damontecres.wholphin.services.BackdropService
@@ -519,6 +522,27 @@ fun NavDrawer(
                                 )
                             }
                         }
+                        // MikeyTV: admin messages, only shown once one has arrived
+                        item {
+                            val messageCenter = LocalMessageCenter.current
+                            val messages by (messageCenter?.messages ?: emptyMessages).collectAsState()
+                            if (messageCenter != null && messages.isNotEmpty()) {
+                                val unread = messages.count { !it.read }
+                                IconNavItem(
+                                    text = stringResource(R.string.mikeytv_messages),
+                                    icon = Icons.Default.Notifications,
+                                    selected = false,
+                                    drawerOpen = isOpen,
+                                    subtext =
+                                        if (unread > 0) {
+                                            pluralStringResource(R.plurals.mikeytv_unread, unread, unread)
+                                        } else {
+                                            null
+                                        },
+                                    onClick = { messageCenter.openPanel() },
+                                )
+                            }
+                        }
                         item {
                             val interactionSource = remember { MutableInteractionSource() }
                             IconNavItem(
@@ -776,6 +800,7 @@ fun navItemColor(
                     AppThemeColors.ORANGE,
                     AppThemeColors.RED,
                     AppThemeColors.BROWN,
+                    AppThemeColors.MIKEYTV,
                     -> MaterialTheme.colorScheme.border
 
                     AppThemeColors.BOLD_BLUE,
@@ -802,3 +827,6 @@ fun navItemColor(
 val DrawerState.isOpen: Boolean get() = this.currentValue.isOpen
 
 val DrawerValue.isOpen: Boolean get() = this == DrawerValue.Open
+
+private val emptyMessages =
+    kotlinx.coroutines.flow.MutableStateFlow(emptyList<com.github.damontecres.wholphin.mikeytv.AdminMessage>())

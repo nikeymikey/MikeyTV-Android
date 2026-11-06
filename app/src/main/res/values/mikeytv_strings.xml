@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="mikeytv_messages">Messages</string>
+    <string name="mikeytv_message_reply_hint">Press Menu or open Messages to reply</string>
+    <string name="mikeytv_quick_got_it">Got it</string>
+    <string name="mikeytv_quick_thanks">Thanks</string>
+    <string name="mikeytv_quick_not_now">Not now</string>
+    <string name="mikeytv_type_reply">Type a reply</string>
+    <string name="mikeytv_close">Close</string>
+    <string name="mikeytv_replies_unavailable">Replies need the MikeyTV Messaging plugin on the server.</string>
+    <string name="mikeytv_you_replied">You replied: %1$s</string>
+    <string name="mikeytv_message_sending">Sending…</string>
+    <string name="mikeytv_message_sent">Reply sent</string>
+    <string name="mikeytv_message_send_failed">Couldn\'t send. Try again.</string>
+    <string name="mikeytv_theme">MikeyTV</string>
+    <plurals name="mikeytv_unread">
+        <item quantity="one">%d unread</item>
+        <item quantity="other">%d unread</item>
+    </plurals>
+</resources>

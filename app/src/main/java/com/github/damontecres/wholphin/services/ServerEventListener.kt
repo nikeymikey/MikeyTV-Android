@@ -9,6 +9,7 @@ import androidx.lifecycle.lifecycleScope
 import com.github.damontecres.wholphin.data.ServerRepository
 import com.github.damontecres.wholphin.data.model.JellyfinServer
 import com.github.damontecres.wholphin.data.model.JellyfinUser
+import com.github.damontecres.wholphin.mikeytv.MessageCenter
 import com.github.damontecres.wholphin.ui.collectLatestIn
 import com.github.damontecres.wholphin.ui.launchDefault
 import com.github.damontecres.wholphin.ui.launchIO
@@ -42,6 +43,7 @@ class ServerEventListener
         @param:ActivityContext private val context: Context,
         private val api: ApiClient,
         private val serverRepository: ServerRepository,
+        private val messageCenter: MessageCenter,
     ) : DefaultLifecycleObserver {
         private val activity = (context as AppCompatActivity)
 
@@ -52,6 +54,7 @@ class ServerEventListener
             serverRepository.current.collectLatestIn(activity.lifecycleScope) {
                 Timber.d("New user/server: %s", it)
                 listenJob?.cancel()
+                messageCenter.onUserChanged(it?.let { c -> "${c.server.id}_${c.user.id}" })
                 if (it != null) {
                     init(it.server, it.user)
                 }
@@ -94,7 +97,16 @@ class ServerEventListener
                                         message.data?.name,
                                     )
                                     when (message.data?.name) {
-                                        GeneralCommandType.DISPLAY_MESSAGE,
+                                        // MikeyTV: keep admin messages and allow replies
+                                        GeneralCommandType.DISPLAY_MESSAGE -> {
+                                            val args = message.data?.arguments
+                                            messageCenter.receive(
+                                                header = args?.get("Header"),
+                                                text = args?.get("Text"),
+                                                requestedTimeoutMs = args?.get("TimeoutMs")?.toLongOrNull(),
+                                            )
+                                        }
+
                                         GeneralCommandType.SEND_STRING,
                                         -> {
                                             val header = message.data?.arguments["Header"]

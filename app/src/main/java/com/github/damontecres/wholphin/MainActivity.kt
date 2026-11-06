@@ -32,6 +32,9 @@ import androidx.tv.material3.ExperimentalTvMaterial3Api
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Surface
 import com.github.damontecres.wholphin.data.ServerRepository
+import com.github.damontecres.wholphin.mikeytv.LocalMessageCenter
+import com.github.damontecres.wholphin.mikeytv.MessageCenter
+import com.github.damontecres.wholphin.mikeytv.MessageOverlay
 import com.github.damontecres.wholphin.preferences.AppPreferences
 import com.github.damontecres.wholphin.preferences.PlayerBackend
 import com.github.damontecres.wholphin.services.AppUpgradeHandler
@@ -149,6 +152,9 @@ class MainActivity : AppCompatActivity() {
 
     @Inject
     lateinit var intentService: IntentService
+
+    @Inject
+    lateinit var messageCenter: MessageCenter
 
     private var signInAuto = true
     private var playerBackend: PlayerBackend? = null
@@ -268,14 +274,19 @@ class MainActivity : AppCompatActivity() {
                                     appThemeColors = appPreferences.interfacePreferences.appThemeColors,
                                 ) {
                                     ProvideLocalClock {
-                                        MainContent(
-                                            backStack = setupNavigationManager.backStack,
-                                            navigationManager = navigationManager,
-                                            userPreferences = userPreferences,
-                                            backdropService = backdropService,
-                                            screensaverService = screensaverService,
-                                            modifier = Modifier.fillMaxSize(),
-                                        )
+                                        CompositionLocalProvider(LocalMessageCenter provides messageCenter) {
+                                            Box(Modifier.fillMaxSize()) {
+                                                MainContent(
+                                                    backStack = setupNavigationManager.backStack,
+                                                    navigationManager = navigationManager,
+                                                    userPreferences = userPreferences,
+                                                    backdropService = backdropService,
+                                                    screensaverService = screensaverService,
+                                                    modifier = Modifier.fillMaxSize(),
+                                                )
+                                                MessageOverlay(messageCenter)
+                                            }
+                                        }
                                     }
                                 }
                             }
@@ -287,6 +298,13 @@ class MainActivity : AppCompatActivity() {
     }
 
     override fun dispatchKeyEvent(event: KeyEvent): Boolean {
+        // MikeyTV: Menu, or Blue where the remote has it, opens a message while its toast shows
+        if (messageCenter.toast.value != null &&
+            (event.keyCode == KeyEvent.KEYCODE_MENU || event.keyCode == KeyEvent.KEYCODE_PROG_BLUE)
+        ) {
+            if (event.action == KeyEvent.ACTION_UP) messageCenter.openPanel()
+            return true
+        }
         if (screensaverService.state.value.run { show || showDim }) {
             screensaverService.stop(false)
             screensaverService.pulse()

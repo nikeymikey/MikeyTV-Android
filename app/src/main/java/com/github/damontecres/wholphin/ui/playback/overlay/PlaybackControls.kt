@@ -30,6 +30,7 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableLongStateOf
@@ -66,6 +67,7 @@ import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
 import androidx.tv.material3.surfaceColorAtElevation
 import com.github.damontecres.wholphin.R
+import com.github.damontecres.wholphin.mikeytv.LocalMessageCenter
 import com.github.damontecres.wholphin.preferences.AppThemeColors
 import com.github.damontecres.wholphin.ui.AppColors
 import com.github.damontecres.wholphin.ui.FontAwesome
@@ -377,6 +379,23 @@ fun RightPlaybackButtons(
             onControllerInteraction = onControllerInteraction,
             modifier = Modifier,
         )
+        // MikeyTV: admin messages, only shown once one has arrived
+        val messageCenter = LocalMessageCenter.current
+        if (messageCenter != null) {
+            val messages by messageCenter.messages.collectAsState()
+            if (messages.isNotEmpty()) {
+                PlaybackButton(
+                    enabled = true,
+                    iconRes = R.drawable.mikeytv_message,
+                    onClick = {
+                        onControllerInteraction.invoke()
+                        messageCenter.openPanel()
+                    },
+                    onControllerInteraction = onControllerInteraction,
+                    modifier = Modifier,
+                )
+            }
+        }
         // Audio
         PlaybackFaButton(
             enabled = true,
