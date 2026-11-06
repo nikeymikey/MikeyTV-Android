@@ -50,7 +50,11 @@ val gitTags =
 
 val gitDescribe =
     providers
-        .exec { commandLine("git", "describe", "--tags", "--long", "--match=v*") }
+        .exec {
+            commandLine("git", "describe", "--tags", "--long", "--match=v*")
+            // MikeyTV: forks may have no tags, which makes git describe fail
+            isIgnoreExitValue = true
+        }
         .standardOutput.asText
         .getOrElse("v0.0.0")
 
